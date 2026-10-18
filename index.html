@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Assistant</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      background: #f5f7fb;
+      color: #172033;
+      font-family: Arial, sans-serif;
+    }
+    main {
+      width: min(100%, 720px);
+      margin: 0 auto;
+      padding: 24px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px #15213a12;
+    }
+    h1 { margin-top: 0; }
+    #conversation {
+      display: flex;
+      min-height: 240px;
+      max-height: 60vh;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      padding: 16px;
+      background: #f5f7fb;
+      border-radius: 8px;
+    }
+    .message {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .user { align-self: flex-end; background: #dce9ff; }
+    .assistant { align-self: flex-start; background: #e9edf3; }
+    .error { align-self: flex-start; color: #9b1c1c; background: #fff0f0; }
+    .meta { display: block; margin-top: 6px; font-size: 12px; color: #5b6578; }
+    form { display: flex; gap: 8px; margin-top: 16px; }
+    textarea {
+      flex: 1;
+      min-width: 0;
+      min-height: 48px;
+      max-height: 160px;
+      padding: 12px;
+      resize: vertical;
+      font: inherit;
+    }
+    button {
+      align-self: flex-end;
+      min-height: 48px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 6px;
+      background: #245fca;
+      color: white;
+      cursor: pointer;
+      font: inherit;
+    }
+    button:disabled { cursor: wait; opacity: 0.65; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AI Assistant</h1>
+    <p>Ask a question below. Each question is answered on its own, with no memory of earlier ones.</p>
+    <section id="conversation" aria-label="Conversation" aria-live="polite">
+      <div class="message assistant">Hi! What would you like to ask?</div>
+    </section>
+    <form id="chat-form">
+      <label for="question" hidden>Your question</label>
+      <textarea id="question" name="question" placeholder="Type your question..." required></textarea>
+      <button id="send-button" type="submit">Send</button>
+    </form>
+  </main>
+
+  <script>
+    const conversationElement = document.getElementById("conversation");
+    const form = document.getElementById("chat-form");
+    const questionInput = document.getElementById("question");
+    const sendButton = document.getElementById("send-button");
+
+    // The page only displays messages. It never sends earlier ones to the server.
+    function addMessage(content, role, meta) {
+      const message = document.createElement("div");
+      message.className = `message ${role}`;
+      message.textContent = content;
+      if (meta) {
+        const small = document.createElement("span");
+        small.className = "meta";
+        small.textContent = meta;
+        message.appendChild(small);
+      }
+      conversationElement.appendChild(message);
+      conversationElement.scrollTop = conversationElement.scrollHeight;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const question = questionInput.value.trim();
+      if (!question || sendButton.disabled) return;
+
+      addMessage(question, "user");
+      questionInput.value = "";
+      sendButton.disabled = true;
+      sendButton.textContent = "Thinking...";
+
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || `Request failed (${response.status})`);
+        }
+        if (typeof data.answer !== "string" || !data.answer.trim()) {
+          throw new Error("The AI returned an empty response.");
+        }
+
+        const meta = `${data.source} · ${data.status} · score ${data.score} · ${data.latency_ms} ms`;
+        addMessage(data.answer, "assistant", meta);
+      } catch (error) {
+        addMessage(`Unable to get a response: ${error.message}`, "error");
+      } finally {
+        sendButton.disabled = false;
+        sendButton.textContent = "Send";
+        questionInput.focus();
+      }
+    });
+  </script>
+</body>
+</html>
