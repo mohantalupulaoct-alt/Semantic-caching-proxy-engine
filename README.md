@@ -1,4 +1,4 @@
-# Semantic Cache Proxy for LLM APIs
+# SCPE – Semantic Cache Proxy Engine
 
 Answers repeated questions from a **vetted cache** instead of paying for the LLM again, and protects that cache from wrong or poisoned answers.
 
